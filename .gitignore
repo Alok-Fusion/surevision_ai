@@ -16,6 +16,8 @@ build/
 electron/dist/
 electron/release/
 electron/out/
+electron/output/
+electron/dist_output/
 
 # production & build output
 dist/

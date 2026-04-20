@@ -94,8 +94,28 @@ async function loadDecision(id){
   }catch(e){alert('Failed to load decision: '+e.message);showScreen('dashboard');}
 }
 
-// ── Workforce AI
+// ── Workforce AI Tabs
+document.querySelectorAll('.res-tab[data-wftab]').forEach(tab => {
+  tab.addEventListener('click', (e) => {
+    document.querySelectorAll('.res-tab[data-wftab]').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.wf-tab-content').forEach(c => {
+      c.style.display = 'none';
+      c.classList.remove('active');
+    });
+    tab.classList.add('active');
+    const target = tab.dataset.wftab;
+    const content = $(`wfTab${target.charAt(0).toUpperCase() + target.slice(1)}`);
+    if(content) {
+      content.style.display = target === 'upload' ? 'flex' : 'block';
+      content.classList.add('active');
+    }
+    if(target === 'directory') loadEmployeeDirectory();
+  });
+});
+
 async function loadWorkforce(){
+  const dashTab = document.querySelector('.res-tab[data-wftab="dashboard"]');
+  if(dashTab) dashTab.click(); // Reset to dashboard tab
   try{
     const r=await apiCall('GET','/api/employees/dashboard');
     if(!r)return;
@@ -108,16 +128,149 @@ async function loadWorkforce(){
       (r.recentEvaluations||[]).map(ev=>{
         const rec=ev.recommendation||'Unknown';
         const displayRec = rec.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-        // Map evaluation recommendation to existing badge colors
         let badgeClass = 'revise';
         if(rec === 'promote' || rec === 'salary_hike') badgeClass = 'approve';
         if(rec === 'pip' || rec === 'demote') badgeClass = 'reject';
         
-        return`<div class="list-row">
+        return`<div class="list-row" style="cursor:pointer;" onclick="loadEmployeeDetail('${ev.employeeRef?._id||''}')">
           <div><div class="list-row-title">${ev.employeeRef?.name || 'Unknown'} - Score: ${ev.overallScore}</div><div class="list-row-sub">${ev.employeeRef?.designation} • ${ev.employeeRef?.department}</div></div>
           <span class="badge badge-${badgeClass}">${displayRec}</span></div>`;
       }).join('');
   }catch(e){console.error('Workforce dashboard error',e);}
+}
+
+async function loadEmployeeDirectory() {
+  const list = $('wfDirectoryList');
+  list.innerHTML = '<div style="padding:20px;color:#64748b;font-size:13px;">Loading directory...</div>';
+  try {
+    const r = await apiCall('GET', '/api/employees');
+    if (!r || !r.employees) return;
+    list.innerHTML = r.employees.length === 0 
+      ? '<div style="padding:20px;color:#64748b;font-size:13px;">No employees found.</div>'
+      : r.employees.map(emp => `
+        <div class="admin-table-row" style="cursor:pointer; grid-template-columns: 2fr 1fr 1fr 1fr;" onclick="loadEmployeeDetail('${emp._id}')">
+          <div><div style="font-weight:600;color:#e2e8f0;">${emp.name}</div><div style="font-size:11px;color:#64748b;">${emp.email}</div></div>
+          <div style="color:#94a3b8;font-size:13px; display:flex; align-items:center;">${emp.department}</div>
+          <div style="display:flex; align-items:center;"><span class="badge badge-${emp.status==='active'?'approve':emp.status==='pip'?'reject':'revise'}">${emp.status}</span></div>
+          <div style="color:#06b6d4;font-size:13px; display:flex; align-items:center;">View Details →</div>
+        </div>
+      `).join('');
+  } catch(e) {
+    list.innerHTML = `<div style="padding:20px;color:#ef4444;font-size:13px;">${e.message}</div>`;
+  }
+}
+
+async function loadEmployeeDetail(id) {
+  if(!id) return;
+  showScreen('empDetail'); 
+  $('empDetName').textContent = 'Loading...';
+  $('empDetRole').textContent = '-';
+  $('empRecordsList').innerHTML = '<div style="padding:10px;color:#64748b;font-size:13px;">Loading...</div>';
+  $('empEvalList').innerHTML = '<div style="color:#64748b;font-size:13px;">Loading...</div>';
+  $('empDetScoreBox').style.display = 'none';
+  $('btnRunEval').onclick = () => runEmployeeEvaluation(id);
+
+  try {
+    const r = await apiCall('GET', `/api/employees/${id}`);
+    const emp = r.employee;
+    $('empDetName').textContent = emp.name;
+    $('empDetRole').textContent = `${emp.designation} • ${emp.department} • Joined ${new Date(emp.dateOfJoining).toLocaleDateString()}`;
+    
+    const rl = $('empRecordsList');
+    rl.innerHTML = r.records.length === 0 ? '<div style="padding:10px;color:#64748b;font-size:13px;">No records uploaded.</div>'
+      : r.records.map(rec => `
+        <div class="admin-table-row" style="grid-template-columns: 1.5fr 1fr 1fr; padding:8px 12px; cursor:default;">
+          <div style="color:#e2e8f0;">${rec.period}</div>
+          <div style="color:#94a3b8;">${rec.qualityScore}/100</div>
+          <div style="color:#94a3b8;">${rec.avgWorkingHours}h</div>
+        </div>
+      `).join('');
+
+    const el = $('empEvalList');
+    el.innerHTML = r.evaluations.length === 0 ? '<div style="color:#64748b;font-size:13px;padding:20px;">No evaluations run yet. Click Run AI Evaluation to generate one.</div>'
+      : r.evaluations.map((ev, i) => {
+          if(i === 0) {
+            $('empDetScoreBox').style.display = 'block';
+            $('empDetScore').textContent = ev.overallScore;
+          }
+          const rec = ev.recommendation || 'Unknown';
+          const displayRec = rec.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+          let badgeClass = 'revise';
+          if(rec === 'promote' || rec === 'salary_hike') badgeClass = 'approve';
+          if(rec === 'pip' || rec === 'demote') badgeClass = 'reject';
+          
+          return `<div class="list-row" style="cursor:default;">
+            <div><div class="list-row-title">${new Date(ev.evaluationDate).toLocaleDateString()}</div><div class="list-row-sub">${ev.executiveSummary.substring(0,80)}...</div></div>
+            <span class="badge badge-${badgeClass}">${displayRec}</span>
+          </div>`;
+      }).join('');
+  } catch(e) {
+    alert('Failed to load employee details: ' + e.message);
+  }
+}
+
+async function runEmployeeEvaluation(id) {
+  const btn = $('btnRunEval');
+  btn.textContent = 'Evaluating...';
+  btn.disabled = true;
+  showProcessing('Generating AI Performance Review...');
+  try {
+    await apiCall('POST', `/api/employees/${id}/evaluate`);
+    await loadEmployeeDetail(id);
+  } catch(e) {
+    alert('Evaluation failed: ' + e.message);
+    loadEmployeeDetail(id);
+  } finally {
+    btn.textContent = 'Run AI Evaluation';
+    btn.disabled = false;
+  }
+}
+
+// Workforce CSV Upload
+const wfDz = $('wfDropZone');
+if(wfDz) {
+  wfDz.ondragover = e => { e.preventDefault(); wfDz.classList.add('over'); };
+  wfDz.ondragleave = () => wfDz.classList.remove('over');
+  wfDz.ondrop = e => { 
+    e.preventDefault(); wfDz.classList.remove('over');
+    const f = e.dataTransfer?.files?.[0]; 
+    if(f) handleWfUpload(f);
+  };
+}
+const btnWf = $('btnWfBrowse');
+if(btnWf) {
+  btnWf.onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = e => {
+      if(e.target.files[0]) handleWfUpload(e.target.files[0]);
+    };
+    input.click();
+  };
+}
+
+async function handleWfUpload(file) {
+  showProcessing('Uploading ' + file.name + '...');
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('http://localhost:5000/api/employees/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` },
+      body: formData
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.message || 'Upload failed');
+    
+    alert(`Success: Processed ${data.summary.totalRows} rows, created ${data.summary.recordsCreated} records.`);
+    showScreen('workforce');
+    const dirTab = document.querySelector('.res-tab[data-wftab="directory"]');
+    if(dirTab) dirTab.click();
+  } catch(e) {
+    alert('Failed to upload: ' + e.message);
+    showScreen('workforce');
+  }
 }
 
 // ── Auto Copilot
@@ -499,3 +652,275 @@ window.electronAPI.onBackendReady(()=>{
   $('statusRight').innerHTML='<span style="color:#34d399;">● Backend Online</span>';
 });
 showScreen('login');
+
+// ── Voice Assistant ──
+const asstFab = $('assistantFab');
+const asstPanel = $('assistantPanel');
+const asstClose = $('closeAssistant');
+const asstChat = $('assistantChat');
+const asstMic = $('btnAsstMic');
+const asstSend = $('btnAsstSend');
+const asstInput = $('asstInput');
+
+let recognition = null;
+let isManuallyStopped = false;
+let speechDebounceTimer = null;
+let speechBuffer = '';
+let voiceEngineActive = false; // separate UI state flag, never tied to engine lifecycle
+
+function initVoiceAssistant() {
+  if (!('webkitSpeechRecognition' in window)) return;
+  
+  if (recognition) {
+    try { recognition.stop(); } catch(e){}
+  }
+
+  recognition = new webkitSpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    // Do NOT update UI here — we manage UI state separately via voiceEngineActive
+    // This prevents the flicker on every internal Chromium stop/restart cycle
+  };
+  
+  recognition.onresult = (event) => {
+    let finalTranscript = '';
+    let interimTranscript = '';
+    
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+    
+    // Update input box with interim if panel is open
+    if (asstPanel.style.display === 'flex' && (interimTranscript || finalTranscript || speechBuffer)) {
+      asstInput.value = speechBuffer + ' ' + (finalTranscript || interimTranscript);
+    }
+    
+    if (finalTranscript) {
+      speechBuffer += ' ' + finalTranscript;
+      speechBuffer = speechBuffer.trim();
+    }
+
+    // Reset the debounce timer every time we hear something
+    clearTimeout(speechDebounceTimer);
+    
+    // Wait 1.2 seconds of silence before executing to ensure the user finished speaking
+    if (speechBuffer || interimTranscript) {
+      speechDebounceTimer = setTimeout(() => {
+        if (!speechBuffer) return;
+        
+        const lowerText = speechBuffer.toLowerCase();
+        const wakeWords = ['hey surevision', 'hey vision', 'surevision', 'vision'];
+        let isWakeWord = false;
+        let command = '';
+
+        for(let w of wakeWords) {
+          if(lowerText.includes(w)) {
+            isWakeWord = true;
+            const idx = lowerText.indexOf(w);
+            command = speechBuffer.substring(idx + w.length).trim();
+            break;
+          }
+        }
+
+        if (isWakeWord) {
+          asstPanel.style.display = 'flex';
+          asstFab.style.display = 'none';
+          
+          if (command.length > 2) {
+            handleAssistantInput(command);
+          } else {
+            addChatMsg("Yes? How can I help?", false);
+          }
+        } else if (asstPanel.style.display === 'flex') {
+          // If panel is open, parse any speech as a command
+          handleAssistantInput(speechBuffer);
+        }
+        
+        // Clear buffer after processing
+        speechBuffer = '';
+      }, 5000);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    // 'no-speech' fires constantly during silence — completely normal, ignore it
+    // 'aborted' fires when we manually call stop() — also expected, ignore it
+    if (e.error === 'no-speech' || e.error === 'aborted' || e.error === 'audio-capture') return;
+    console.warn('Voice engine non-critical error:', e.error);
+  };
+
+  recognition.onend = () => {
+    if (isManuallyStopped) {
+      // User explicitly stopped — clear the UI
+      stopListeningUI();
+      return;
+    }
+    // Chromium auto-stopped due to silence — restart silently
+    // CRITICAL: Do NOT call stopListeningUI() here — that causes the flicker
+    if (authToken) {
+      setTimeout(() => {
+        try {
+          recognition.start();
+        } catch(e) {
+          // Engine died hard — rebuild fully, but restore UI state immediately
+          recognition = null;
+          setTimeout(() => {
+            initVoiceAssistant();
+            // Restore correct UI state after rebuild
+            if (voiceEngineActive) applyVoiceUI();
+          }, 300);
+        }
+      }, 250);
+    }
+  };
+  
+  isManuallyStopped = false;
+  voiceEngineActive = true;
+  applyVoiceUI();
+  try { recognition.start(); } catch(e){}
+}
+
+function applyVoiceUI() {
+  if (asstPanel.style.display === 'flex') {
+    asstMic.classList.add('active');
+    asstFab.classList.add('listening');
+    asstFab.classList.remove('passive-listening');
+    asstInput.placeholder = 'Listening...';
+  } else {
+    asstFab.classList.add('passive-listening');
+    asstFab.classList.remove('listening');
+  }
+}
+
+// Initialize immediately if we have a token
+if(localStorage.getItem('token')) {
+  setTimeout(initVoiceAssistant, 1000);
+}
+
+function stopListeningUI() {
+  voiceEngineActive = false;
+  asstMic.classList.remove('active');
+  asstFab.classList.remove('listening');
+  asstFab.classList.remove('passive-listening');
+  if (asstInput.placeholder === 'Listening...') asstInput.placeholder = 'Ask SureVision...';
+}
+
+asstFab.onclick = () => {
+  asstPanel.style.display = 'flex';
+  asstFab.style.display = 'none';
+  asstInput.focus();
+  if (voiceEngineActive) applyVoiceUI();
+};
+asstClose.onclick = () => {
+  asstPanel.style.display = 'none';
+  asstFab.style.display = 'flex';
+  if (voiceEngineActive) applyVoiceUI();
+};
+
+asstMic.onclick = () => {
+  if(!recognition) initVoiceAssistant();
+  
+  if(asstMic.classList.contains('active')) {
+    isManuallyStopped = true;
+    try{ recognition.stop(); }catch(e){}
+    stopListeningUI();
+    addChatMsg("Voice assistant paused.", false);
+  } else {
+    isManuallyStopped = false;
+    voiceEngineActive = true;
+    applyVoiceUI();
+    try{ recognition.stop(); }catch(e){}
+    setTimeout(() => { try{ recognition.start(); }catch(e){} }, 300);
+    addChatMsg("Voice assistant listening...", false);
+  }
+};
+
+asstSend.onclick = () => {
+  const txt = asstInput.value.trim();
+  if(txt) handleAssistantInput(txt);
+};
+asstInput.onkeypress = (e) => {
+  if(e.key === 'Enter') asstSend.click();
+};
+
+function addChatMsg(text, isUser=false) {
+  const div = document.createElement('div');
+  div.className = `chat-msg ${isUser ? 'user-msg' : 'ai-msg'}`;
+  div.textContent = text;
+  asstChat.appendChild(div);
+  asstChat.scrollTop = asstChat.scrollHeight;
+}
+
+function handleAssistantInput(text) {
+  addChatMsg(text, true);
+  asstInput.value = '';
+  const lower = text.toLowerCase();
+  
+  // Natural Language Intent Parser
+  if(lower.match(/(dashboard|home)/)) {
+    showScreen('dashboard');
+    loadDashboard();
+    addChatMsg("Opening Dashboard...");
+  } else if(lower.match(/(workforce|employee|team)/)) {
+    showScreen('workforce');
+    loadWorkforce();
+    addChatMsg("Navigating to Workforce Intelligence.");
+  } else if(lower.match(/(history|past|previous)/)) {
+    showScreen('history');
+    loadHistory();
+    addChatMsg("Opening your decision history.");
+  } else if(lower.match(/(settings|profile)/)) {
+    showScreen('settings');
+    loadSettings();
+    addChatMsg("Opening settings.");
+  } else if(lower.match(/(auto|upload|analyze file)/)) {
+    showScreen('auto');
+    addChatMsg("Opening Auto Copilot. Please upload your file.");
+  } else if(lower.match(/(sign out|logout|log off)/)) {
+    addChatMsg("Signing you out...");
+    setTimeout(() => $('btnLogout').click(), 1000);
+  } else if(lower.match(/(what if|simulate|forecast)/)) {
+    showScreen('whatif');
+    addChatMsg("Opening What-If Simulation mode.");
+  } 
+  // Gemini Smart Routing Fallback
+  else {
+    addChatMsg("Routing your scenario to Gemini AI for analysis...");
+    setTimeout(() => {
+      showScreen('manual');
+      const box = $('manualContext');
+      if(box) {
+        box.value = text;
+        addChatMsg("I've pasted your request into the Manual Input form. You can adjust it or click Analyze!");
+      }
+    }, 1000);
+  }
+}
+
+// Intercept showScreen to handle FAB visibility
+const origShowScreen = showScreen;
+showScreen = function(id) {
+  origShowScreen(id);
+  if(id !== 'login' && asstPanel.style.display === 'none') {
+    asstFab.style.display = 'flex';
+    if(!recognition && authToken) {
+      initVoiceAssistant();
+    } else if(recognition && authToken && !isManuallyStopped) {
+      try { recognition.start(); } catch(e){}
+    }
+  } else if(id === 'login') {
+    asstFab.style.display = 'none';
+    asstPanel.style.display = 'none';
+    if(recognition) {
+      isManuallyStopped = true;
+      try{ recognition.stop(); }catch(e){}
+    }
+  }
+};

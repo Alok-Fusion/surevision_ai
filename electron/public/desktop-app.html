@@ -294,29 +294,88 @@
 
       <!-- Workforce Screen -->
       <div class="screen" id="screenWorkforce">
-        <div class="screen-header">
-          <h2>Workforce Intelligence</h2>
-          <p class="sub">AI-powered employee performance and risk evaluation.</p>
+        <div class="screen-header results-hdr">
+          <div>
+            <h2>Workforce Intelligence</h2>
+            <p class="sub">AI-powered employee performance and risk evaluation.</p>
+          </div>
+          <div class="res-tabs">
+            <button class="res-tab active" data-wftab="dashboard">Dashboard</button>
+            <button class="res-tab" data-wftab="directory">Directory</button>
+            <button class="res-tab" data-wftab="upload">Upload Data</button>
+          </div>
         </div>
-        <div class="screen-body no-scroll" style="display:flex;flex-direction:column;gap:0;padding:20px 28px;">
-          <div class="dash-top">
-            <div class="stat-card">
-              <div class="stat-label">Total Employees</div>
-              <div class="stat-value" id="wfTotal">-</div>
+        
+        <div class="screen-body" style="padding:0; display:flex; flex-direction:column; overflow:hidden;">
+          <!-- Dashboard Tab -->
+          <div class="wf-tab-content" id="wfTabDashboard" style="padding:20px 28px; display:block; overflow-y:auto;">
+            <div class="dash-top">
+              <div class="stat-card"><div class="stat-label">Total Employees</div><div class="stat-value" id="wfTotal">-</div></div>
+              <div class="stat-card"><div class="stat-label">Avg Performance</div><div class="stat-value cyan" id="wfAvgScore">-</div></div>
+              <div class="stat-card"><div class="stat-label">PIP Risk</div><div class="stat-value amber" id="wfPipCount">-</div></div>
             </div>
-            <div class="stat-card">
-              <div class="stat-label">Avg Performance</div>
-              <div class="stat-value cyan" id="wfAvgScore">-</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">PIP Risk</div>
-              <div class="stat-value amber" id="wfPipCount">-</div>
+            <div class="dash-bottom" style="grid-template-columns: 1fr; margin-top: 24px;">
+              <div class="dash-card">
+                <h3>Recent Evaluations</h3>
+                <div class="scroll-list" id="wfEvalList"><div style="color:#64748b;font-size:13px;">Loading...</div></div>
+              </div>
             </div>
           </div>
-          <div class="dash-bottom" style="grid-template-columns: 1fr; margin-top: 24px;">
+
+          <!-- Directory Tab -->
+          <div class="wf-tab-content" id="wfTabDirectory" style="padding:20px 28px; display:none; overflow-y:auto; height:100%;">
+            <div class="admin-table">
+              <div class="admin-table-hdr" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+                <span>Employee</span><span>Department</span><span>Status</span><span>Action</span>
+              </div>
+              <div id="wfDirectoryList"><div style="padding:20px;color:#64748b;font-size:13px;">Loading directory...</div></div>
+            </div>
+          </div>
+
+          <!-- Upload Tab -->
+          <div class="wf-tab-content center" id="wfTabUpload" style="padding:20px 28px; display:none; flex-direction:column; justify-content:center; align-items:center; height:100%;">
+             <div class="drop-zone" id="wfDropZone">
+                <div class="drop-icon">📊</div>
+                <h2 class="drop-title">Upload HR Data</h2>
+                <p class="drop-sub">Upload employee performance CSV</p>
+                <button class="btn-primary" id="btnWfBrowse">Browse Files</button>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employee Detail Screen -->
+      <div class="screen" id="screenEmpDetail">
+        <div class="screen-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <button class="btn-ghost" style="padding:4px 8px; margin-bottom:8px;" onclick="showScreen('workforce')">← Back</button>
+            <h2 id="empDetName">Loading...</h2>
+            <p class="sub" id="empDetRole">-</p>
+          </div>
+          <div style="display:flex; gap:16px; align-items:center;">
+             <div id="empDetScoreBox" style="text-align:right; display:none;">
+               <div style="font-size:26px; font-weight:bold; color:white;" id="empDetScore">--</div>
+               <div style="font-size:11px; color:#64748b; text-transform:uppercase;">Overall Score</div>
+             </div>
+             <button class="btn-primary" id="btnRunEval">Run AI Evaluation</button>
+          </div>
+        </div>
+        <div class="screen-body">
+          <div class="dash-bottom" style="grid-template-columns: 1fr 1fr; gap:20px; height:100%;">
+            <!-- History Table -->
             <div class="dash-card">
-              <h3>Recent Evaluations</h3>
-              <div class="scroll-list" id="wfEvalList"><div style="color:#64748b;font-size:13px;">Loading...</div></div>
+              <h3>Performance Records</h3>
+              <div class="admin-table" style="margin-top:12px; border:none; background:transparent;">
+                <div class="admin-table-hdr" style="grid-template-columns: 1.5fr 1fr 1fr;">
+                  <span>Period</span><span>Quality</span><span>Hours</span>
+                </div>
+                <div id="empRecordsList"><div style="padding:10px;color:#64748b;font-size:13px;">Loading...</div></div>
+              </div>
+            </div>
+            <!-- Evaluations -->
+            <div class="dash-card">
+              <h3>AI Evaluations</h3>
+              <div class="scroll-list" id="empEvalList"><div style="color:#64748b;font-size:13px;">Loading...</div></div>
             </div>
           </div>
         </div>
@@ -421,6 +480,29 @@
         </div>
         <div class="screen-body results-body" id="resultsContainer">
           <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- AI Voice Assistant Overlay -->
+      <div id="assistantFab" class="assistant-fab" style="display:none;">
+        <span class="fab-icon">🎙️</span>
+      </div>
+      
+      <div id="assistantPanel" class="assistant-panel" style="display:none;">
+        <div class="assistant-header">
+          <div class="assistant-title">
+            <div class="logo-gem" style="width:16px;height:16px;border-radius:4px;"></div>
+            <span>SureVision Assistant</span>
+          </div>
+          <button id="closeAssistant" class="btn-ghost" style="padding:4px 8px;">✕</button>
+        </div>
+        <div id="assistantChat" class="assistant-chat">
+          <div class="chat-msg ai-msg">Hi! I'm your AI Copilot. You can speak or type to control SureVision. How can I help?</div>
+        </div>
+        <div class="assistant-input-area">
+          <button id="btnAsstMic" class="asst-mic-btn">🎙️</button>
+          <input type="text" id="asstInput" class="asst-text-input" placeholder="Ask Gemini...">
+          <button id="btnAsstSend" class="asst-send-btn">➤</button>
         </div>
       </div>
 

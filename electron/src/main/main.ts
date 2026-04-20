@@ -27,8 +27,9 @@ let splashWindow: BrowserWindow | null = null;
 let trayManager: TrayManager | null = null;
 let backendProcess: ChildProcess | null = null;
 
+const isProd = app.isPackaged;
 const BACKEND_PORT = 5000;
-const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+const API_BASE_URL = isProd ? "https://surevision-ai-e9vy.onrender.com" : `http://localhost:${BACKEND_PORT}`;
 const projectRoot = path.resolve(__dirname, "..", "..", "..");
 
 // ── Error handling ───────────────────────────────────────────────────────────
@@ -91,6 +92,19 @@ function createMainWindow(): BrowserWindow {
 
   win.loadFile(path.join(__dirname, "..", "..", "public", "desktop-app.html"));
 
+  win.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      callback(true);
+    } else {
+      callback(true); // allow all for desktop
+    }
+  });
+
+  win.webContents.session.setPermissionCheckHandler((webContents, permission) => {
+    if (permission === 'media') return true;
+    return true;
+  });
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
@@ -138,9 +152,7 @@ function spawnBackend(): ChildProcess {
 
 // ── Health Check ─────────────────────────────────────────────────────────────
 function checkUrl(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    http.get(url, (res) => resolve((res.statusCode ?? 500) < 500)).on("error", () => resolve(false));
-  });
+  return fetch(url).then(r => r.ok).catch(() => false);
 }
 
 async function waitForServer(url: string, label: string, timeoutMs = 120_000): Promise<boolean> {
@@ -203,59 +215,35 @@ async function analyzeWithBackend(filePath: string): Promise<any> {
   mainWindow?.webContents.send("analysis:progress", { step: "analyzing", message: "Running AI analysis..." });
 
   // Call backend desktop endpoint
-  const postData = JSON.stringify({
+  const postData = {
     title: fileName.replace(/\.[^.]+$/, ""),
     description: content,
     fileName,
     fileContent: content,
     currentPainPoint: `Automated analysis of ${fileName}`
+  };
+
+  const res = await fetch(`${API_BASE_URL}/api/desktop/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(postData)
   });
 
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        hostname: "localhost",
-        port: BACKEND_PORT,
-        path: "/api/desktop/analyze",
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(postData)
-        },
-        timeout: 120000
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          try {
-            const result = JSON.parse(data);
-            if (res.statusCode && res.statusCode >= 400) {
-              reject(new Error(result.message || `Backend error: ${res.statusCode}`));
-            } else {
-              // Store in history
-              const id = `analysis_${Date.now()}`;
-              const historyEntry = { id, filePath, fileName, timestamp: new Date().toISOString(), ...result };
-              const history: any[] = (store.get("analysisHistory") as any[]) || [];
-              history.unshift(historyEntry);
-              if (history.length > 50) history.pop();
-              store.set("analysisHistory", history);
+  if (!res.ok) {
+    const err: any = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Backend error: ${res.status}`);
+  }
 
-              mainWindow?.webContents.send("analysis:progress", { step: "done", message: "Analysis complete!" });
-              resolve(historyEntry);
-            }
-          } catch (e) {
-            reject(new Error("Failed to parse backend response"));
-          }
-        });
-      }
-    );
+  const result: any = await res.json();
+  const id = `analysis_${Date.now()}`;
+  const historyEntry = { id, filePath, fileName, timestamp: new Date().toISOString(), ...(typeof result === 'object' && result ? result : {}) };
+  const history: any[] = (store.get("analysisHistory") as any[]) || [];
+  history.unshift(historyEntry);
+  if (history.length > 50) history.pop();
+  store.set("analysisHistory", history);
 
-    req.on("error", (e) => reject(new Error(`Backend connection failed: ${e.message}`)));
-    req.on("timeout", () => { req.destroy(); reject(new Error("Analysis timed out")); });
-    req.write(postData);
-    req.end();
-  });
+  mainWindow?.webContents.send("analysis:progress", { step: "done", message: "Analysis complete!" });
+  return historyEntry;
 }
 
 // ── IPC Handlers ─────────────────────────────────────────────────────────────
@@ -317,45 +305,26 @@ function registerIPC() {
       await new Promise((r) => setTimeout(r, 300));
       mainWindow?.webContents.send("analysis:progress", { step: "analyzing", message: "Running AI analysis..." });
 
-      const postData = JSON.stringify(formData);
-
-      return await new Promise((resolve, reject) => {
-        const req = http.request(
-          {
-            hostname: "localhost",
-            port: BACKEND_PORT,
-            path: "/api/desktop/analyze",
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(postData) },
-            timeout: 120000
-          },
-          (res) => {
-            let data = "";
-            res.on("data", (chunk) => (data += chunk));
-            res.on("end", () => {
-              try {
-                const result = JSON.parse(data);
-                if (res.statusCode && res.statusCode >= 400) {
-                  reject(new Error(result.message || `Backend error: ${res.statusCode}`));
-                } else {
-                  const id = `manual_${Date.now()}`;
-                  const historyEntry = { id, fileName: formData.title || "Manual Decision", timestamp: new Date().toISOString(), ...result };
-                  const history: any[] = (store.get("analysisHistory") as any[]) || [];
-                  history.unshift(historyEntry);
-                  if (history.length > 50) history.pop();
-                  store.set("analysisHistory", history);
-                  mainWindow?.webContents.send("analysis:progress", { step: "done", message: "Analysis complete!" });
-                  resolve(historyEntry);
-                }
-              } catch { reject(new Error("Failed to parse response")); }
-            });
-          }
-        );
-        req.on("error", (e) => reject(new Error(`Backend connection failed: ${e.message}`)));
-        req.on("timeout", () => { req.destroy(); reject(new Error("Analysis timed out")); });
-        req.write(postData);
-        req.end();
+      const res = await fetch(`${API_BASE_URL}/api/desktop/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
       });
+
+      if (!res.ok) {
+        const err: any = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Backend error: ${res.status}`);
+      }
+
+      const result: any = await res.json();
+      const id = `manual_${Date.now()}`;
+      const historyEntry = { id, fileName: formData.title || "Manual Decision", timestamp: new Date().toISOString(), ...(typeof result === 'object' && result ? result : {}) };
+      const history: any[] = (store.get("analysisHistory") as any[]) || [];
+      history.unshift(historyEntry);
+      if (history.length > 50) history.pop();
+      store.set("analysisHistory", history);
+      mainWindow?.webContents.send("analysis:progress", { step: "done", message: "Analysis complete!" });
+      return historyEntry;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Manual analysis failed";
       log.error("Manual analysis error:", message);
@@ -365,42 +334,30 @@ function registerIPC() {
 
   // Generic API request handler for renderer
   ipcMain.handle("api:request", async (_event, { method, path, body, token }: any) => {
-    return new Promise((resolve, reject) => {
-      const postData = body ? JSON.stringify(body) : "";
+    try {
       const headers: any = { "Content-Type": "application/json" };
-      if (body) headers["Content-Length"] = Buffer.byteLength(postData);
       if (token) headers["Authorization"] = `Bearer ${token}`;
+      
+      const targetUrl = path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`;
 
-      const req = http.request(
-        {
-          hostname: "localhost",
-          port: BACKEND_PORT,
-          path,
-          method: method || "GET",
-          headers,
-          timeout: 10000
-        },
-        (res) => {
-          let data = "";
-          res.on("data", (chunk) => (data += chunk));
-          res.on("end", () => {
-            try {
-              if (!data) return resolve(null);
-              const result = JSON.parse(data);
-              if (res.statusCode && res.statusCode >= 400) {
-                reject(new Error(result.message || `Backend error: ${res.statusCode}`));
-              } else {
-                resolve(result);
-              }
-            } catch { resolve(data); }
-          });
-        }
-      );
-      req.on("error", (e) => reject(new Error(`API failed: ${e.message}`)));
-      req.on("timeout", () => { req.destroy(); reject(new Error("API timed out")); });
-      if (body) req.write(postData);
-      req.end();
-    });
+      const res = await fetch(targetUrl, {
+        method: method || "GET",
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+      });
+
+      const data = await res.text();
+      if (!data) return null;
+      
+      const result = JSON.parse(data);
+      if (!res.ok) {
+        throw new Error(result.message || `Backend error: ${res.status}`);
+      }
+      return result;
+    } catch (error) {
+       const msg = error instanceof Error ? error.message : String(error);
+       throw new Error(`API failed: ${msg}`);
+    }
   });
 
   log.info("IPC handlers registered");
@@ -437,12 +394,14 @@ app.whenReady().then(async () => {
     onSettings: () => { mainWindow?.show(); mainWindow?.focus(); }
   });
 
-  // 5. Spawn backend only
-  updateSplash({ message: "Starting backend server..." });
-  backendProcess = spawnBackend();
+  // 5. Spawn backend only if not packaged
+  if (!isProd) {
+    updateSplash({ message: "Starting local backend server..." });
+    backendProcess = spawnBackend();
+  }
 
   updateSplash({ message: "Waiting for backend API..." });
-  const backendOk = await waitForServer(`${BACKEND_URL}/health`, "Backend");
+  const backendOk = await waitForServer(`${API_BASE_URL}/health`, "Backend", isProd ? 30000 : 120000);
   updateSplash({ backendReady: backendOk, frontendReady: true });
 
   if (!backendOk) {

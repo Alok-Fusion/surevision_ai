@@ -16,6 +16,7 @@ export function UploadDropzone() {
   const [category, setCategory] = useState("invoice");
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<any>(null);
 
   const previewIcon = useMemo(() => {
     if (!file) return UploadCloud;
@@ -42,7 +43,8 @@ export function UploadDropzone() {
     formData.append("category", category);
     setLoading(true);
     try {
-      await api.post("/upload", formData);
+      const res = await api.post("/upload", formData);
+      setUploadResult(res.data.upload);
       toast.success("File metadata and preview stored");
       setFile(null);
     } catch (uploadError) {
@@ -104,7 +106,50 @@ export function UploadDropzone() {
           <CardTitle>File Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          {file ? (
+          {uploadResult ? (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-sm font-semibold text-emerald-100">Upload Processed</p>
+                </div>
+                <p className="mt-2 text-sm text-emerald-200/70">
+                  {uploadResult.fileName} • {category}
+                </p>
+              </div>
+              
+              <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                <div className="border-b border-white/10 bg-white/5 p-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">AI Data Extraction Preview</p>
+                </div>
+                <div className="p-4">
+                  {uploadResult.extractedData?.previewRows?.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <tbody>
+                          {uploadResult.extractedData.previewRows.map((row: string[], i: number) => (
+                            <tr key={i} className="border-b border-white/5 last:border-0">
+                              {row.map((cell: string, j: number) => (
+                                <td key={j} className="p-2 text-muted-foreground whitespace-nowrap">{cell}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground font-mono whitespace-pre-wrap line-clamp-6">
+                      {uploadResult.extractedData?.previewText || "No readable text extracted."}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setUploadResult(null)}>Upload Another</Button>
+              </div>
+            </div>
+          ) : file ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-sm font-semibold text-foreground">{file.name}</p>

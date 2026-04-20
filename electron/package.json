@@ -15,7 +15,7 @@
     "appId": "com.surevision.ai.desktop",
     "productName": "SureVision AI",
     "directories": {
-      "output": "output"
+      "output": "dist_output"
     },
     "files": [
       "dist/**/*",
