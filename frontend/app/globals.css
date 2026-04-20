@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222 54% 6%;
+  --foreground: 210 40% 96%;
+  --card: 222 46% 10%;
+  --card-foreground: 210 40% 96%;
+  --border: 217 30% 18%;
+  --input: 214 25% 24%;
+  --ring: 174 72% 56%;
+  --primary: 184 82% 46%;
+  --primary-foreground: 222 47% 8%;
+  --secondary: 222 35% 14%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 221 31% 13%;
+  --muted-foreground: 215 17% 69%;
+  --accent: 43 93% 58%;
+  --accent-foreground: 222 47% 8%;
+  --destructive: 350 82% 62%;
+  --destructive-foreground: 210 40% 98%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  min-height: 100%;
+  background: hsl(var(--background));
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(34, 211, 238, 0.14), transparent 30rem),
+    radial-gradient(circle at 82% 0%, rgba(139, 92, 246, 0.1), transparent 32rem),
+    radial-gradient(circle at 68% 88%, rgba(16, 185, 129, 0.08), transparent 34rem),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  letter-spacing: 0;
+  text-rendering: geometricPrecision;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+body::after {
+  position: fixed;
+  inset: -24% -10% auto -10%;
+  z-index: -1;
+  height: 42rem;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(120deg, rgba(34, 211, 238, 0.16), rgba(139, 92, 246, 0.08), rgba(16, 185, 129, 0.12)),
+    radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.08), transparent 36rem);
+  filter: blur(48px);
+  opacity: 0.52;
+  transform-origin: center;
+  animation: enterpriseGlow 14s ease-in-out infinite alternate;
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.35);
+  color: white;
+}
+
+.glass-panel {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.86), rgba(8, 15, 30, 0.72));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(22px);
+}
+
+.subtle-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+@keyframes enterpriseGlow {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, 3%, 0) scale(1.05);
+  }
+  100% {
+    transform: translate3d(4%, -1%, 0) scale(1.02);
+  }
+}
+
+@keyframes counterRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.counter-rise {
+  animation: counterRise 420ms ease-out both;
+}

@@ -21,9 +21,11 @@ Built expressly for high-stakes environments like banking, insurance, and logist
 ## ✨ Features
 
 - **Decision Analysis Engine:** Powered by Google's Gemini LLM to dissect enterprise proposals and generate board-ready executive summaries.
+- **Workforce AI Evaluation:** Ingests employee performance CSVs to predict PIP risks and recommend promotion pathways via quantitative AI scoring.
 - **Cost of Inaction Metrics:** Automatically computes the daily financial bleed of executive bottlenecks using risk exposure logic.
+- **Native Desktop App:** A lightweight Electron client serving real-time decision intelligence and workforce insights outside the browser.
 - **Premium Reporting:** One-click, physically signable PDF exports utilizing `pdfkit` and beautiful dark-mode HTML email briefs.
-- **Enterprise Controls:** Fully integrated RBAC (Viewer, Analyst, Admin), audit logging, secure SMTP tokenized password resets, and user authentication.
+- **Enterprise Controls:** Fully integrated RBAC (Viewer, Analyst, Admin), audit logging, secure SMTP tokenized password resets, and strict data ownership.
 - **World-Class UI:** Glassmorphism aesthetics driven by Tailwind CSS and orchestrated micro-animations using Framer Motion.
 
 ## 🏗️ Architecture
@@ -52,6 +54,9 @@ cd frontend && npm install
 
 # Install backend dependencies
 cd ../backend && npm install
+
+# Install desktop app dependencies
+cd ../electron && npm install
 ```
 
 ### 2. Environment Variables
@@ -90,6 +95,10 @@ npm run dev
 
 # Terminal 2: Frontend
 cd frontend
+npm run dev
+
+# Terminal 3: Native Desktop App
+cd electron
 npm run dev
 ```
 

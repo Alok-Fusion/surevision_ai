@@ -1,0 +1,30 @@
+import { Router } from "express";
+import { adminRoutes } from "./adminRoutes";
+import { alertRoutes } from "./alertRoutes";
+import { authRoutes } from "./authRoutes";
+import { dashboardRoutes } from "./dashboardRoutes";
+import { decisionRoutes } from "./decisionRoutes";
+import { desktopRoutes } from "./desktopRoutes";
+import { emailRoutes } from "./emailRoutes";
+import { employeeRoutes } from "./employeeRoutes";
+import { exportRoutes } from "./exportRoutes";
+import { historyRoutes } from "./historyRoutes";
+import { settingsRoutes } from "./settingsRoutes";
+import { uploadRoutes } from "./uploadRoutes";
+import { whatIfRoutes } from "./whatIfRoutes";
+
+export const apiRoutes = Router();
+
+apiRoutes.use("/auth", authRoutes);
+apiRoutes.use("/dashboard", dashboardRoutes);
+apiRoutes.use("/decision", decisionRoutes);
+apiRoutes.use("/employees", employeeRoutes);
+apiRoutes.use("/history", historyRoutes);
+apiRoutes.use("/upload", uploadRoutes);
+apiRoutes.use("/alerts", alertRoutes);
+apiRoutes.use("/export", exportRoutes);
+apiRoutes.use("/email", emailRoutes);
+apiRoutes.use("/admin", adminRoutes);
+apiRoutes.use("/whatif", whatIfRoutes);
+apiRoutes.use("/settings", settingsRoutes);
+apiRoutes.use("/desktop", desktopRoutes);

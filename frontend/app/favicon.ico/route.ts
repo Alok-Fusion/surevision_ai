@@ -1,0 +1,14 @@
+export function GET() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="18" fill="#07111f"/>
+    <rect x="17" y="17" width="30" height="30" rx="8" fill="#14b8a6"/>
+    <path d="M22 34.5 29 41l14-18" fill="none" stroke="#fef3c7" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  return new Response(svg, {
+    headers: {
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "public, max-age=86400"
+    }
+  });
+}

@@ -1,0 +1,265 @@
+# SureVision AI - Technical Project Documentation
+
+## 1. Project Overview & Problem Statement
+
+SureVision AI is an enterprise decision intelligence platform. Modern executives often make high-stakes operational changes (e.g., swapping a logistics vendor, automating an AP workflow) based on static spreadsheets and biased human proposals. This leads to hidden compliance risks, SLA leakage, and unexpected cost overruns.
+
+SureVision AI solves this by intaking enterprise decision proposals and simulating outcomes using a custom LLM orchestration layer (Gemini). It predicts hidden risks, models standard ROI and Trust scores, calculates the **Cost of Inaction (COI)**, and generates board-ready phased rollout plans.
+
+## 2. Architecture & Tech Stack
+
+The platform is designed as a decoupled full-stack Monorepo with four main components:
+
+### Frontend
+- **Framework:** Next.js 15 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS, Framer Motion (for premium micro-animations)
+- **State Management:** Zustand (auth-store, dissent-store)
+- **Component System:** Custom UI library (Lucide icons, Radix primitives)
+- **Charts:** Recharts
+
+### Backend
+- **Framework:** Node.js (Express.js)
+- **Language:** TypeScript
+- **Database:** MongoDB (Mongoose ORM)
+- **Authentication:** JWT (access + refresh tokens), bcryptjs (12 rounds)
+- **Services:** Nodemailer (SMTP), PDFKit (PDF generation), CSV-Stringify
+- **Validation:** Zod
+
+### AI Engine
+- **Framework:** Python (FastAPI)
+- **Language:** Python
+- **Primary Core:** Google Gemini LLM API (Gemini 1.5/2.5 Flash)
+- **Integration:** Evaluates deterministic payload algorithms against predictive NLP. Includes a dynamic trust re-evaluation engine for stakeholder dissent.
+
+### Shared
+- **Type Definitions:** Shared Zod schemas between frontend/backend
+- **API Types:** Shared TypeScript interfaces
+
+## 3. Core Data Flow & User Journey
+
+### Authentication Flow
+1. User registers with name, email, password, company, phone, socials
+2. System sends verification email (token-based)
+3. User must verify email before login (security measure)
+4. Login returns JWT access token (short-lived) + refresh token (long-lived)
+5. Token refresh maintains session persistence
+6. Password reset via secure email token
+7. All auth events logged to audit trail
+
+### Decision Analysis Flow
+1. **Input:** User submits decision via form with:
+   - Title, description
+   - Department (Finance, Operations, HR, IT, Sales, Legal)
+   - Industry (Banking, Insurance, Healthcare, Logistics, Manufacturing)
+   - Budget impact (currency)
+   - Time horizon (30, 90, 365 days)
+   - Stakeholders affected
+   - Current pain point
+   - Urgency level (low/medium/high/critical)
+   - Compliance sensitivity (low/medium/high)
+
+2. **AI Processing:** Backend sends to Gemini via AI Engine, returns structured analysis
+
+3. **Output:** Results displayed on dashboard with:
+   - Recommendation (Approve/Revise/Reject/Pilot)
+   - 5 scoring dimensions (Risk, Trust, Compliance, ROI, Human Impact)
+   - Executive summary
+   - Hidden risks (3-5)
+   - Silent patterns (3-5)
+   - Safer alternative
+   - Phased rollout plan (3-5 steps)
+   - Boardroom debate perspectives
+
+### Stakeholder Dissent Flow
+1. Stakeholder submits objection with category, severity, rationale
+2. AI re-evaluates trust score based on severity:
+   - Minor: -1 to -5 points
+   - Major: -10 to -15 points
+   - Blocking: -20 to -40 points
+3. Trust score animates dynamically on dashboard
+4. Admin can resolve/dismiss with note
+5. PDF export shows warning if blocking objections exist
+
+### Export Flow
+1. **PDF:** Generates board-ready document with signature blocks
+2. **CSV:** Single-row spreadsheet for data analysis
+3. **Email:** HTML email with dark-mode template
+
+## 4. Complete API Endpoints Reference
+
+### Auth Module (`/api/auth`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /register | Create new user (name, email, password, company, phone, socials) |
+| POST | /login | Login with email/password, returns JWT |
+| POST | /refresh | Refresh expired access token |
+| POST | /verify-email | Verify email via token |
+| POST | /resend-verification | Resend verification email |
+| POST | /forgot-password | Request password reset |
+| POST | /reset-password | Reset password via token |
+| GET | /me | Get current user profile |
+| POST | /logout | Logout (creates audit log) |
+
+### Decision Module (`/api/decision`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | / | Create decision, trigger AI analysis (Admin/Analyst) |
+| GET | / | Get all decisions (paginated) |
+| GET | /:id | Get single decision with analysis |
+| PUT | /:id | Update decision (Admin/Analyst) |
+| DELETE | /:id | Delete decision (Admin only) |
+| GET | /:id/dissent | Get all objections |
+| POST | /:id/dissent | Submit new objection |
+| PATCH | /:id/dissent/:obId/resolve | Resolve objection (Admin) |
+| PATCH | /:id/dissent/:obId/dismiss | Dismiss objection (Admin) |
+
+### Dashboard Module (`/api/dashboard`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | / | Get comprehensive dashboard data |
+
+### History Module (`/api/history`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | / | Get paginated decision history |
+
+### Export Module (`/api/export`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /pdf | Generate PDF report |
+| POST | /csv | Generate CSV spreadsheet |
+
+### What-If Module (`/api/whatif`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | / | Run what-if scenario simulation |
+
+### Upload Module (`/api/upload`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | / | Upload file for friction analysis |
+
+### Admin Module (`/api/admin`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /users | List all users |
+| PATCH | /users/:id/role | Update user role |
+| DELETE | /users/:id | Delete user |
+| GET | /audit-logs | Get audit logs (last 100) |
+| GET | /feature-flags | Get feature flags |
+| GET | /system-health | Get system health |
+
+### Settings Module (`/api/settings`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | / | Get user settings |
+| PUT | /profile | Update profile |
+| POST | /gemini-key | Save personal Gemini API key |
+| DELETE | /gemini-key | Remove personal API key |
+
+### Other Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/alerts | Get system alerts |
+| POST | /api/email | Send email report |
+
+## 5. AI Analysis Outputs
+
+### Decision Analysis (`/ai/analyze`)
+Returns these fields:
+- **recommendation:** "Approve" | "Revise" | "Reject" | "Pilot"
+- **riskScore:** 0-100 integer
+- **trustScore:** 0-100 integer
+- **complianceScore:** 0-100 integer
+- **roiScore:** 0-100 integer
+- **humanImpactScore:** 0-100 integer
+- **bestCase:** string
+- **likelyCase:** string
+- **worstCase:** string
+- **hiddenRisks:** array of 3-5 strings
+- **silentPatterns:** array of 3-5 strings
+- **saferAlternative:** string
+- **rolloutPlan:** array of 3-5 strings
+- **executiveSummary:** full text
+- **boardroomDebate:** array of CFO/COO/CHRO/Compliance perspectives
+
+### What-If Simulation (`/ai/whatif`)
+Returns:
+- **costSaved:** integer
+- **riskDelta:** integer
+- **slaImpact:** string
+- **customerImpact:** string
+- **recommendation:** string
+
+### Insights/Friction (`/ai/insights`)
+Analyzes uploaded files for workflow friction
+
+## 6. Cost of Inaction (COI) Calculation
+
+Formula:
+```
+dailyBleed = Math.round((budgetImpact * (riskScore / 100)) / 30)
+monthlyLeakage = dailyBleed * 30
+```
+
+Example: $1M budget, 60 risk score
+- Daily: $20,000/day
+- Monthly: $600,000/month
+
+## 7. Security & Permission System (RBAC)
+
+### Roles
+| Role | Permissions |
+|------|-------------|
+| **Viewer** | Read-only: dashboard, history, decision results |
+| **Analyst** | Create/update decisions, view history, export, submit objections |
+| **Admin** | Full access: manage users, resolve/dismiss objections, view audit logs |
+
+### Security Middleware
+- `requireAuth` - Captures JWT
+- `requireRole(role)` - Protects admin routes
+
+## 8. Testing Strategy
+
+### End-to-End Tests
+1. **Full Pipeline:** User registration -> Login -> Submit decision -> Export PDF
+2. **Dissent Impact:** Blocking objection -> Trust score drops -> PDF warning
+3. **Password Safety:** Unverified user denied password reset
+4. **Role Defense:** Viewer denied admin endpoints (403)
+
+### Unit Tests
+1. **COI Calculation:** $1M budget * 0.5 risk = $16,650/month
+2. **Token Expiration:** 61+ minute token rejected
+3. **Form Validation:** Missing required fields -> 400 error
+
+### UI Tests
+1. **Onboarding Tour:** localStorage state prevents re-render
+2. **Dashboard:** Framer Motion animations work
+
+## 9. Frontend Pages
+
+| Page | Route | Description |
+|------|-------|-------------|
+| Landing | / | Landing page with animated demo |
+| Login | /login | User login |
+| Register | /register | User registration |
+| Forgot Password | /forgot-password | Password reset request |
+| Reset Password | /reset-password | Reset with token |
+| Verify Email | /verify-email | Email verification |
+| Dashboard | /dashboard | Main dashboard |
+| Analyze | /analyze | Decision submission |
+| Results | /results/:id | Analysis results |
+| History | /history | Decision history |
+| What-If | /what-if | Scenario simulator |
+| Upload | /upload | File upload |
+| Settings | /settings | User settings |
+| Admin | /admin | Admin panel |
+
+## 10. Deployment Considerations
+
+- Environment Variables: MongoDB URI, SMTP, Gemini API Keys, Frontend URLs
+- Build: `npm run build` transpiles Next.js and Node
+- PDF Generation: Requires adequate RAM
+- Docker: All services containerized (MongoDB, AI Engine, Backend, Frontend)
+- Ports: Frontend 3000, Backend 5000, AI Engine 8000

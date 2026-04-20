@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <title>SureVision AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background: #0a0a0a; 
+      color: #fff; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    // Minimal desktop UI - inline to avoid build complexity
+    const root = document.getElementById('root');
+    
+    const icons = {
+      mic: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+      folder: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+      settings: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42-1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42 1.42"/></svg>',
+      activity: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+      alert: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      check: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+      x: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+      file: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    };
+    
+    const state = {
+      listening: false,
+      watchFolder: '',
+      results: []
+    };
+    
+    function render() {
+      const listeningBadge = state.listening 
+        ? '<div style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px;"><div style="width:8px;height:8px;background:#ef4444;border-radius:50%;animation:pulse 1s infinite;"></div><span style="font-size:12px;color:#f87171;">Listening...</span></div>'
+        : '';
+      
+      const folderPath = state.watchFolder
+        ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📁 ${state.watchFolder}</div>`
+        : '';
+      
+      const resultsList = state.results.length === 0
+        ? '<div style="font-size:13px;color:#64748b;text-align:center;padding:24px 0;">No files analyzed yet</div>'
+        : state.results.slice(0,8).map(r => {
+          const statusColor = r.status === 'completed' ? '#34d399' : r.status === 'processing' ? '#fbbf24' : '#f87171';
+          return '<div style="padding:12px;margin-bottom:8px;background:rgba(255,255,255,0.05);border-radius:8px;border:1px solid rgba(255,255,255,0.05);">' +
+            '<div style="display:flex;justify-content:space-between;align-items:start;">' +
+              '<div style="display:flex;gap:8px;">' +
+                '<div style="color:#22d3ee;margin-top:2px;">' + icons.file + '</div>' +
+                '<div><p style="font-size:13px;font-weight:500;color:#e2e8f0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + r.fileName + '</p>' +
+                '<p style="font-size:11px;color:#64748b;">' + r.fileType + '</p></div>' +
+              '</div>' +
+              '<span style="font-size:11px;color:' + statusColor + ';">' + r.status + '</span>' +
+            '</div>' +
+            (r.riskScore ? '<div style="margin-top:8px;font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:4px;"><span><span style="color:#64748b;">Risk:</span> <span style="color:' + (r.riskScore >= 70 ? '#34d399' : r.riskScore >= 40 ? '#fbbf24' : '#f87171') + ';">' + r.riskScore + '</span></span><span><span style="color:#64748b;">Trust:</span> <span style="color:' + (r.trustScore >= 70 ? '#34d399' : r.trustScore >= 40 ? '#fbbf24' : '#f87171') + ';">' + r.trustScore + '</span></span></div>' : '') +
+          '</div>';
+        }).join('');
+      
+      root.innerHTML = '<div style="min-height:100vh;background:#000;padding:16px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+          '<h1 style="font-size:18px;font-weight:600;color:#34d399;">SureVision AI</h1>' +
+          '<button onclick="window.electronAPI.window.minimize()" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;padding:4px;">' + icons.x + '</button>' +
+        '</div>' +
+        
+        '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
+          '<button id="voiceBtn" onclick="toggleVoice()" style="flex:1;padding:10px;background:' + (state.listening ? '#dc2626' : '#059669') + ';border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">' + 
+            (state.listening ? icons.mic : '') + ' ' + (state.listening ? 'Stop' : 'Voice') +
+          '</button>' +
+          '<button onclick="selectFolder()" style="flex:1;padding:10px;background:transparent;border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">' + 
+            icons.folder + ' Watch' +
+          '</button>' +
+          '<button onclick="window.electronAPI.window.quit()" style="padding:10px;background:transparent;border:none;color:#94a3b8;cursor:pointer;">' + 
+            icons.settings +
+          '</button>' +
+        '</div>' +
+        
+        listeningBadge +
+        folderPath +
+        
+        '<div style="background:rgba(15,23,42,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:16px;">' +
+          '<div style="font-size:14px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:8px;color:#22d3ee;">' + 
+            icons.activity + ' Recent Analysis' +
+          '</div>' +
+          resultsList +
+        '</div>' +
+        
+        '<div style="font-size:11px;text-align:center;color:#475569;">' +
+          '<kbd style="padding:4px 8px;background:#1e293b;border-radius:4px;margin:0 4px;">Ctrl+Shift+V</kbd> toggle window' +
+          '<span style="margin:0 8px;">·</span>' +
+          '<kbd style="padding:4px 8px;background:#1e293b;border-radius:4px;margin:0 4px;">Ctrl+Shift+A</kbd> voice' +
+        '</div>' +
+      '</div>' +
+      '<style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}</style>';
+    }
+    
+    async function toggleVoice() {
+      try {
+        const status = await window.electronAPI.voice.status();
+        if (status) {
+          await window.electronAPI.voice.stop();
+        } else {
+          await window.electronAPI.voice.start();
+        }
+        state.listening = !status;
+      } catch (e) {
+        state.listening = !state.listening;
+      }
+      render();
+    }
+    
+    async function selectFolder() {
+      try {
+        const folder = await window.electronAPI.folder.select();
+        if (folder) state.watchFolder = folder;
+      } catch (e) {
+        console.log('Error selecting folder:', e);
+      }
+      render();
+    }
+    
+    // Initialize
+    async function init() {
+      try {
+        state.watchFolder = await window.electronAPI.folder.get() || '';
+        state.results = await window.electronAPI.analysis.getRecent() || [];
+      } catch (e) {
+        console.log('Running in browser or initialization error');
+      }
+      render();
+    }
+    
+    init();
+    
+    // Make functions globally available
+    window.toggleVoice = toggleVoice;
+    window.selectFolder = selectFolder;
+  </script>
+</body>
+</html>
