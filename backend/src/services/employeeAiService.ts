@@ -49,7 +49,7 @@ export async function evaluateEmployee(
   fallback: ReturnType<typeof deterministicRecommendation>,
   geminiApiKey?: string
 ): Promise<AiEvaluationResult> {
-  const apiKey = geminiApiKey || "AIzaSyD4iexMkjIPJ5j0U6vWnLVeF5fX8COV-tI";
+  const apiKey = geminiApiKey || "";
 
   const periodSummaries = records
     .sort((a, b) => a.period.localeCompare(b.period))
